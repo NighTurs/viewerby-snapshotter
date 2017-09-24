@@ -4,7 +4,8 @@ import sys
 import datetime
 import filecmp
 import logging
-from urllib.request import urlretrieve
+from urllib.error import URLError
+from urllib.request import urlopen
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -30,7 +31,15 @@ def snapshot_clients(clients):
             continue
 
         file_path = '{}/{}.jpg'.format(client, dt.strftime('%Y%m%d%H%M%S'))
-        urlretrieve(URL.format(client), file_path)
+
+        request = urlopen(URL.format(client), timeout=30)
+        with open(file_path, 'wb') as f:
+            try:
+                f.write(request.read())
+            except URLError as e:
+                print('Failed to get snapshot, client={}, prev_snapshot_time={}, reason={}'
+                      .format(client, prev_snapshot_time.get(client), e.reason))
+
         if client in prev_snapshot and filecmp.cmp(file_path, prev_snapshot[client]):
             next_min_flag[client] = False
             os.remove(file_path)
